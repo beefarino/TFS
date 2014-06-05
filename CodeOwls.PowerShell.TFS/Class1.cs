@@ -14,7 +14,7 @@ using Microsoft.TeamFoundation.Client;
 
 namespace CodeOwls.TFS
 {
-    [CmdletProvider("TFS", ProviderCapabilities.ShouldProcess)]
+    [CmdletProvider("TFS", ProviderCapabilities.ShouldProcess | ProviderCapabilities.Credentials)]
     public class TFSProvider : Provider
     {
         protected override IPathResolver PathResolver
@@ -47,6 +47,8 @@ namespace CodeOwls.TFS
         public TFSDrive(PSDriveInfo drive) : base( new PSDriveInfo( drive.Name, drive.Provider, "["+drive.Root.Encode()+"]", drive.Description, drive.Credential))
         {            
         }
+        
+
     }
 
     public class TFSPathResolver : PathResolverBase
@@ -64,6 +66,12 @@ namespace CodeOwls.TFS
             var uri = match.Groups[1].Value;
             uri = uri.Decode();
             ServerUri = new Uri(uri);
+            
+            var creds = String.IsNullOrEmpty(context.Credential.UserName ) ? context.Drive.Credential : context.Credential;
+            if (null != creds)
+            {
+                Credential = creds.GetNetworkCredential();
+            }
 
             path = UriPattern.Replace(path, String.Empty);
 
@@ -72,9 +80,10 @@ namespace CodeOwls.TFS
 
         protected override IPathNode Root
         {
-            get { return new ConfigurationServerNode(ServerUri); }
+            get { return new ConfigurationServerNode(ServerUri, Credential); }
         }
 
+        private ICredentials Credential { get; set; }
         private Uri ServerUri { get; set; }
     }
 
@@ -82,7 +91,7 @@ namespace CodeOwls.TFS
     {
         private readonly Uri _serverUri;
         private TfsConfigurationServer _server;
-        private ICredentials _credentials;
+        private readonly ICredentials _credentials;
 
         public ConfigurationServerNode(Uri serverUri, ICredentials credentials)
         {
@@ -101,6 +110,8 @@ namespace CodeOwls.TFS
                 return _server;
             }
         }
+
+        
         public override IPathValue GetNodeValue()
         {
             return new ContainerPathValue( Server, Name );
